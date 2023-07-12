@@ -9,13 +9,13 @@ def Conv2d_BN(inChannels, outChannels,kernel=3, dropout=0, padding=0, dilate=1, 
         nn.BatchNorm2d(outChannels),
         nn.Dropout(dropout)
     )
-def Conv2d_GN(inChannels, outChannels,kernel=3, dropout=0, padding=0, dilate=1, b_bias=False):
+def Conv2d_GN(inChannels, outChannels,kernel=3, dropout=0, padding=0, group=1,dilate=1, b_bias=False):
   return nn.Sequential(
         nn.Conv2d(in_channels=inChannels, out_channels=outChannels, 
                   kernel_size=(kernel, kernel), padding=padding, bias=b_bias,
                   dilation = dilate),
         nn.ReLU(),            
-        nn.GroupNorm(4,outChannels),
+        nn.GroupNorm(group,outChannels),
         nn.Dropout(dropout)
     )
 def Conv2d(inChannels, outChannels,kernel=3, padding=0, dilate=1, b_bias=False):
