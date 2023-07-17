@@ -1,8 +1,8 @@
 import torch.nn as nn
 
-def Conv2d_BN(inChannels, outChannels,kernel=3, dropout=0, padding=0, dilate=1, b_bias=False):
+def Conv2d_BN(inChannels, outChannels,kernel=3, dropout=0, padding=0, dilate=1,stride=1, b_bias=False):
   return nn.Sequential(
-        nn.Conv2d(in_channels=inChannels, out_channels=outChannels, 
+        nn.Conv2d(in_channels=inChannels, out_channels=outChannels, stride=stride, 
                   kernel_size=(kernel, kernel), padding=padding, bias=b_bias,
                   dilation = dilate),
         nn.ReLU(),            
