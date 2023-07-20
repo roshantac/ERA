@@ -40,14 +40,14 @@ def get_data_alb():
       ToTensorV2(),
       ],p=1)
   train_data = Cifar10SearchDataset(root='./data', train=True,download=True, transform=train_transform)
-  trainloader = torch.utils.data.DataLoader(train_data, batch_size= 100,
+  trainloader = torch.utils.data.DataLoader(train_data, batch_size= 512,
                                             shuffle=True, num_workers=2)
   test_transforms = A.Compose(
 
     [ A.Normalize(mean = (0.4914, 0.4822, 0.4465), std = (0.2470, 0.2435, 0.2616),p =1.0),ToTensorV2()], p=1.0)
 
   test_data = Cifar10SearchDataset(root='./data', train=False,download=True, transform=test_transforms)
-  testloader = torch.utils.data.DataLoader(test_data, batch_size=100, shuffle=False, num_workers=2)
+  testloader = torch.utils.data.DataLoader(test_data, batch_size=512, shuffle=False, num_workers=2)
   testset2 = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transforms.Compose([transforms.ToTensor()]))
   testloader2 = torch.utils.data.DataLoader(testset2, batch_size=1, shuffle=False, num_workers=2)
   classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
@@ -87,12 +87,12 @@ def getData():
   ])
   trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
                                           download=True, transform=transform_train)
-  trainloader = torch.utils.data.DataLoader(trainset, batch_size= 500,
+  trainloader = torch.utils.data.DataLoader(trainset, batch_size= 512,
                                             shuffle=True, num_workers=2)
 
   testset = torchvision.datasets.CIFAR10(root='./data', train=False,
                                         download=True, transform=transform_test)
-  testloader = torch.utils.data.DataLoader(testset, batch_size=100,
+  testloader = torch.utils.data.DataLoader(testset, batch_size=512,
                                           shuffle=False, num_workers=2)
   testset2 = torchvision.datasets.CIFAR10(root='./data', train=False,
                                         download=True, transform=transforms.Compose([transforms.ToTensor()]))
