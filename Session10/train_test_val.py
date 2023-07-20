@@ -91,17 +91,17 @@ class train_test_evaluate:
 
 
 
-  def Training(self,epochs,model,device, trainloader, testloader, LR):
+  def Training(self,epochs,model,device,optimizer, trainloader, testloader, LR):
     Testloss = 0
-    LRvalues = self.OneCyclePolicy(LR, 5, epochs)
-    optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.95)
-    #scheduler = ReduceLROnPlateau(optimizer, 'min') #StepLR(optimizer, step_size=6, gamma=0.1)
+    #LRvalues = self.OneCyclePolicy(LR, 5, epochs)
+    #optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.95)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=LR, steps_per_epoch=len(trainloader), epochs=epochs)
     for epoch in range(epochs):
         print("EPOCH:", epoch)
-        self.update_lr(optimizer,LRvalues[epoch])
+        #self.update_lr(optimizer,LRvalues[epoch])
         self.train(model, device, trainloader, optimizer, epoch)
         Testloss = self.test(model, device, testloader)
-        #scheduler.step(Testloss)
+        scheduler.step()
 
   def plotPerformanceGraph(self):
     import matplotlib.pyplot as plt
