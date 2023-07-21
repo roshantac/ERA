@@ -4,6 +4,7 @@ import torch.optim as optim
 import torch.nn.functional as F
 import torch.nn as nn
 import torch
+lernrate=[]
 class train_test_evaluate:
   def __init__(self):
   ############################## Training  ###########################################
@@ -12,13 +13,13 @@ class train_test_evaluate:
     self.train_acc = []
     self.test_acc = []
 
-  def train(self,model, device, train_loader, optimizer, epoch):
+  def train(self,model,criterion, device, train_loader, optimizer, epoch):
     model.train()
     pbar = tqdm(train_loader)
     correct = 0
     processed = 0
     train_loss = 0
-    criterion = nn.CrossEntropyLoss()
+    #criterion = nn.CrossEntropyLoss()
     for batch_idx, (data, target) in enumerate(pbar):
       # get samples
       data, target = data.to(device), target.to(device)
@@ -47,11 +48,11 @@ class train_test_evaluate:
     self.train_acc.append(100*correct/processed)
     #return train_losses, train_acc
 
-  def test(self,model, device, test_loader):
+  def test(self,model,criterion, device, test_loader):
       model.eval()
       test_loss = 0
       correct = 0
-      criterion = nn.CrossEntropyLoss()
+      # criterion = nn.CrossEntropyLoss()
       with torch.no_grad():
           for data, target in test_loader:
               data, target = data.to(device), target.to(device)
@@ -91,17 +92,18 @@ class train_test_evaluate:
 
 
 
-  def Training(self,epochs,model,device,optimizer, trainloader, testloader, LR):
+  def Training(self,epochs,model,criterion,device, optimizer, trainloader, testloader, LR):
     Testloss = 0
-    #LRvalues = self.OneCyclePolicy(LR, 5, epochs)
+    LRvalues = self.OneCyclePolicy(LR, 1, epochs)
     #optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.95)
-    scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=LR, steps_per_epoch=len(trainloader), epochs=epochs)
+    #scheduler = ReduceLROnPlateau(optimizer, 'min') #StepLR(optimizer, step_size=6, gamma=0.1)
     for epoch in range(epochs):
         print("EPOCH:", epoch)
-        #self.update_lr(optimizer,LRvalues[epoch])
-        self.train(model, device, trainloader, optimizer, epoch)
-        Testloss = self.test(model, device, testloader)
-        scheduler.step()
+        self.update_lr(optimizer,LRvalues[epoch])
+        lernrate.append(LRvalues[epoch])
+        self.train(model, criterion,device, trainloader, optimizer, epoch)
+        Testloss = self.test(model,criterion, device, testloader)
+        #scheduler.step(Testloss)
 
   def plotPerformanceGraph(self):
     import matplotlib.pyplot as plt
