@@ -1,169 +1,287 @@
-from tqdm import tqdm
-from torch.optim.lr_scheduler import StepLR, ReduceLROnPlateau
-import torch.optim as optim
-import torch.nn.functional as F
 import torch.nn as nn
+import torch.nn.functional as F
+from base_functions import *
+dropout_value = 0.1
+
 import torch
-lernrate=[]
-class train_test_evaluate:
-  def __init__(self):
-  ############################## Training  ###########################################
-    self.train_losses = []
-    self.test_losses = []
-    self.train_acc = []
-    self.test_acc = []
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
 
-  def train(self,model,criterion, device, train_loader, optimizer, epoch,scheduler):
-    model.train()
-    pbar = tqdm(train_loader)
-    correct = 0
-    processed = 0
-    train_loss = 0
-    #criterion = nn.CrossEntropyLoss()
-    for batch_idx, (data, target) in enumerate(pbar):
-      # get samples
-      data, target = data.to(device), target.to(device)
+class Net_resnet(nn.Module):
+    def __init__(self):
+        super(Net_resnet, self).__init__()
+        
+        self.preplayer = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()
+        )
+        
+        self.convblock1 = nn.Sequential(
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.MaxPool2d(2,2),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+        )
+  
+        self.resblock1 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+        ) 
+        
+ 
+        self.convblock2 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.MaxPool2d(2,2),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+        )
+      
+        self.convblock3 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.MaxPool2d(2,2),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+        )
+      
+        self.resblock2 = nn.Sequential(
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+        ) 
 
-      # Init
-      optimizer.zero_grad()
-      # In PyTorch, we need to set the gradients to zero before starting to do backpropragation because PyTorch accumulates the gradients on subsequent backward passes.
-      # Because of this, when you start your training loop, ideally you should zero out the gradients so that you do the parameter update correctly.
-      # Predict
-      y_pred = model(data)
+        self.maxpool = nn.Sequential(
+            nn.MaxPool2d(4,2)
+        ) 
 
-      # Calculate loss
-      #loss = F.nll_loss(y_pred, target)
-      loss = criterion(y_pred, target)
-      #train_losses.append(loss)
-      train_loss +=loss.item()
-      # Backpropagation
-      loss.backward()
-      optimizer.step()
-      if scheduler:
-        scheduler.step()
-        lernrate.append(scheduler.get_last_lr()[0])
-      # Update pbar-tqdm
-      pred = y_pred.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-      correct += pred.eq(target.view_as(pred)).sum().item()
-      processed += len(data)
-      pbar.set_description(desc= f'Loss={loss.item()} Batch_id={batch_idx} Accuracy={100*correct/processed:0.2f}')
-    self.train_losses.append(loss.item()) # train_loss
-    self.train_acc.append(100*correct/processed)
-    #return train_losses, train_acc
+        self.fc = nn.Sequential(
+            nn.Linear(512, 10)
+    
+        ) 
 
-  def test(self,model,criterion, device, test_loader):
-      model.eval()
-      test_loss = 0
-      correct = 0
-      # criterion = nn.CrossEntropyLoss()
-      with torch.no_grad():
-          for data, target in test_loader:
-              data, target = data.to(device), target.to(device)
-              output = model(data)
-              #test_loss += F.nll_loss(output, target, reduction='sum').item()  # sum up batch loss
-              test_loss += criterion(output, target).item()
-              pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-              correct += pred.eq(target.view_as(pred)).sum().item()
-
-      test_loss /= len(test_loader.dataset)
-      self.test_losses.append(test_loss)
-
-      print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
-          test_loss, correct, len(test_loader.dataset),
-          100. * correct / len(test_loader.dataset)))
-
-      self.test_acc.append(100. * correct / len(test_loader.dataset))
-      return test_loss
-
-  def update_lr(self,optimizer, lr):
-      for g in optimizer.param_groups:
-          g['lr'] = lr
-
-
-  def OneCyclePolicy(self,LRmax, step, iterations):
-      LRmin = LRmax/10;
-      LRt = LRmin
-      LRvalues =[]
-      for x in range(iterations):
-          if (x<=step):
-            LRt += (LRmax - LRmin)/step
-            LRvalues.append(LRt)
-          else:
-            LRt -= (LRmax - LRmin)/(iterations-step)
-            LRvalues.append(LRt)
-      return LRvalues
-
-
-
-  def Training(self,epochs,model,criterion,device, optimizer, trainloader, testloader, scheduler):
-    Testloss = 0
-    #optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.95)
-    for epoch in range(epochs):
-        print("EPOCH:", epoch)
-        self.train(model, criterion,device, trainloader, optimizer, epoch, scheduler)
-        Testloss = self.test(model,criterion, device, testloader)
+    def forward(self, x):
+        x = self.preplayer(x)
+        x = self.convblock1(x)
+        rn1 = self.resblock1(x)
+        x = x+rn1
+        x = self.convblock2(x)
+        x = self.convblock3(x)
+        rn2 = self.resblock2(x)
+        x = x+rn2
+        x = self.maxpool(x)
+        x = self.fc(torch.squeeze(x))
+        x = x.view(-1, 10)
+        return F.log_softmax(x, dim=-1)
+class Net_depth_dialated(nn.Module):
+    def __init__(self):
+        super(Net_depth_dialated, self).__init__()
+        self.C1 = Conv2d_BN(3,32,dropout=0.1, padding=1)     # 32    C1
+        self.C2 = Conv2d_BN(32,48,dropout=0.1, padding=1)    # 32 #. C2
+        self.C2_1 = Conv2d_BN(48,64,dropout=0.1, padding=1)    # 32 #. C2
+        self.c_3= Conv1x1(64,32)
+        self.P1 = Conv2d_BN(32,32,kernel=2,stride=2)
+        self.C3 = Conv2d_BN(32,48,dropout=0.1,dilate=2, padding=2)  #16 #. C3
+        self.C4 = DepthwiseConv2D(48,32,1,dropout=0.1)   # 16 #  C4
+        self.C5 = Conv2d_BN(32,64,dropout=0.1, padding=1)#16#. C5
+        self.c_6= Conv1x1(64,48)                           #  C6
+        self.P2 = Conv2d_BN(48,48,kernel=2,stride=2)
+        self.C7 = Conv2d_BN(48,64, dropout=0.1, padding=1) # 8.#. C7
+        self.C8 = Conv2d_BN(64,48, dropout=0.1, padding=1) # 8  #  C8
+        self.C9 = Conv2d(48,64, padding=1) #. C9
+        self.gap= gap(8)
+        self.FC = Conv1x1(64,10)
 
 
-  def plotPerformanceGraph(self):
-    import matplotlib.pyplot as plt
-    fig, (axs1,axs2) = plt.subplots(2, 1,figsize=(15,10))
-
-    axs1.plot(self.train_losses, label = " Train Loss")
-    axs1.plot(self.test_losses, label = " Test Loss")
-    axs1.set_title(" Loss")
-
-    axs2.plot(self.train_acc, label = " Train Accuracy")
-    axs2.plot(self.test_acc, label = " Test Accuracy")
-
-    axs2.set_title(" Accuracy")
-    axs1.legend()
-    axs2.legend()
-    plt.show()
-
-  def MissClassifedImage(self,dataSet, model,device, dispCount,classes):
-    import matplotlib.pyplot as plt
-    import numpy as np
-    import math
-
-    dataiter = iter(dataSet)
-    fig, axs = plt.subplots(int(math.ceil(dispCount/5)),5,figsize=(10,10))
-    fig.tight_layout()
-    count =0
-    while True:
-        if count >= dispCount:
-          break
-        images, labels = next(dataiter)
-        imagex = images
-        images, labels = images.to(device), labels.to(device)
-        model= model.to(device)
-        output = model(images)
-        a, predicted = torch.max(output, 1)
-        if(labels != predicted):
-          imagex = imagex.squeeze()
-          imagex = np.transpose(imagex, (1, 2, 0))
-          axs[int(count/5), count%5].imshow(imagex)
-          axs[int(count/5), count%5].set_title("Orig: "+str(classes[labels])+", Pred: "+str(classes[predicted]))
-          fig.tight_layout(pad=3.0)
-          count = count +1
-    plt.show()
-
-  def ClassTestAccuracy(self,testloader,device,model, classes):
-    class_correct = list(0. for i in range(10))
-    class_total = list(0. for i in range(10))
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            images =images.to(device)
-            labels = labels.to(device)
-            outputs = model(images)
-            _, predicted = torch.max(outputs, 1)
-            c = (predicted == labels).squeeze()
-            for i in range(4):
-                label = labels[i]
-                class_correct[label] += c[i].item()
-                class_total[label] += 1
+    def forward(self,x):
+      #32
+      x = self.C1(x)
+      x = self.C2(x)
+      x = self.C2_1(x)
+      x = self.c_3(x)
+      xp = self.P1(x)
+      #16
+      s = self.C3(xp)
+      x = self.C4(s)+xp
+      x = self.C5(x)
+      x = self.c_6(x) + s
+      s2 = self.P2(x)
+      #8
+      s = self.C7(s2)
+      x = self.C8(s) + s2
+      x = self.C9(x) + s
+      #gap
+      x = self.gap(x)
+      x = self.FC(x)
+      x=x.view(-1,10)
+      return F.log_softmax(x, dim= -1)
 
 
-    for i in range(10):
-        print('Accuracy of %5s : %2d %%' % (
-            classes[i], 100 * class_correct[i] / class_total[i]))
+
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.dropout = nn.Dropout(dropout_value)
+        # Input Block
+        self.convblock1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=14, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm2d(14),
+            nn.Dropout(dropout_value)
+        ) # output_size = 26
+
+        # CONVOLUTION BLOCK 1
+        self.convblock2 = nn.Sequential(
+            nn.Conv2d(in_channels=14, out_channels=22, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm2d(22),
+            nn.Dropout(dropout_value)
+        ) # output_size = 24
+
+        # TRANSITION BLOCK 1
+        self.convblock3 = nn.Sequential(
+            nn.Conv2d(in_channels=22, out_channels=18, kernel_size=(1, 1), padding=0, bias=False),
+            nn.BatchNorm2d(18),
+        ) # output_size = 24
+        self.pool1 = nn.MaxPool2d(2, 2) # output_size = 12
+
+        # CONVOLUTION BLOCK 2
+        self.convblock4 = nn.Sequential(
+            nn.Conv2d(in_channels=18, out_channels=24, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),            
+            nn.BatchNorm2d(24),
+            nn.Dropout(dropout_value)
+        ) # output_size = 10
+        self.convblock5 = nn.Sequential(
+            nn.Conv2d(in_channels=24, out_channels=18, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),            
+            nn.BatchNorm2d(18),
+            nn.Dropout(dropout_value)
+        ) # output_size = 8
+        self.convblock6 = nn.Sequential(
+            nn.Conv2d(in_channels=18, out_channels=24, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),            
+            nn.BatchNorm2d(24),
+            nn.Dropout(dropout_value)
+        ) # output_size = 6
+        self.convblock7 = nn.Sequential(
+            nn.Conv2d(in_channels=24, out_channels=16, kernel_size=(3, 3), padding=1, bias=False),
+            nn.ReLU(),            
+            nn.BatchNorm2d(16),
+
+        ) # output_size = 6
+        
+        # OUTPUT BLOCK
+        self.gap = nn.Sequential(
+            nn.AvgPool2d(kernel_size=6)
+        ) # output_size = 1
+
+        self.convblock8 = nn.Sequential(
+            nn.Conv2d(in_channels=16, out_channels=10, kernel_size=(1, 1), padding=0, bias=False),
+  
+        ) 
+
+
+        
+
+    def forward(self, x):
+        x = self.convblock1(x)
+        x = self.convblock2(x)
+        x = self.convblock3(x)
+        x = self.pool1(x)
+        x = self.convblock4(x)
+        x = self.convblock5(x)
+        x = self.convblock6(x)
+        x = self.convblock7(x)
+        x = self.gap(x)        
+        x = self.convblock8(x)
+
+        x = x.view(-1, 10)
+        return F.log_softmax(x, dim=-1)
+class Net(nn.Module):
+    def __init__(self):
+        super(Net, self).__init__()
+        self.dropout = nn.Dropout(dropout_value)
+        # Input Block
+        self.convblock1 = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=14, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm2d(14),
+            nn.Dropout(dropout_value)
+        ) # output_size = 26
+
+        # CONVOLUTION BLOCK 1
+        self.convblock2 = nn.Sequential(
+            nn.Conv2d(in_channels=14, out_channels=22, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm2d(22),
+            nn.Dropout(dropout_value)
+        ) # output_size = 24
+
+        # TRANSITION BLOCK 1
+        self.convblock3 = nn.Sequential(
+            nn.Conv2d(in_channels=22, out_channels=18, kernel_size=(1, 1), padding=0, bias=False),
+            nn.BatchNorm2d(18),
+        ) # output_size = 24
+        self.pool1 = nn.MaxPool2d(2, 2) # output_size = 12
+
+        # CONVOLUTION BLOCK 2
+        self.convblock4 = nn.Sequential(
+            nn.Conv2d(in_channels=18, out_channels=24, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),            
+            nn.BatchNorm2d(24),
+            nn.Dropout(dropout_value)
+        ) # output_size = 10
+        self.convblock5 = nn.Sequential(
+            nn.Conv2d(in_channels=24, out_channels=18, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),            
+            nn.BatchNorm2d(18),
+            nn.Dropout(dropout_value)
+        ) # output_size = 8
+        self.convblock6 = nn.Sequential(
+            nn.Conv2d(in_channels=18, out_channels=24, kernel_size=(3, 3), padding=0, bias=False),
+            nn.ReLU(),            
+            nn.BatchNorm2d(24),
+            nn.Dropout(dropout_value)
+        ) # output_size = 6
+        self.convblock7 = nn.Sequential(
+            nn.Conv2d(in_channels=24, out_channels=16, kernel_size=(3, 3), padding=1, bias=False),
+            nn.ReLU(),            
+            nn.BatchNorm2d(16),
+
+        ) # output_size = 6
+        
+        # OUTPUT BLOCK
+        self.gap = nn.Sequential(
+            nn.AvgPool2d(kernel_size=6)
+        ) # output_size = 1
+
+        self.convblock8 = nn.Sequential(
+            nn.Conv2d(in_channels=16, out_channels=10, kernel_size=(1, 1), padding=0, bias=False),
+  
+        ) 
+
+
+        
+
+    def forward(self, x):
+        x = self.convblock1(x)
+        x = self.convblock2(x)
+        x = self.convblock3(x)
+        x = self.pool1(x)
+        x = self.convblock4(x)
+        x = self.convblock5(x)
+        x = self.convblock6(x)
+        x = self.convblock7(x)
+        x = self.gap(x)        
+        x = self.convblock8(x)
+
+        x = x.view(-1, 10)
+        return F.log_softmax(x, dim=-1)
