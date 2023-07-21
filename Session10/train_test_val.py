@@ -13,7 +13,7 @@ class train_test_evaluate:
     self.train_acc = []
     self.test_acc = []
 
-  def train(self,model,criterion, device, train_loader, optimizer, epoch):
+  def train(self,model,criterion, device, train_loader, optimizer, epoch,scheduler):
     model.train()
     pbar = tqdm(train_loader)
     correct = 0
@@ -39,6 +39,9 @@ class train_test_evaluate:
       # Backpropagation
       loss.backward()
       optimizer.step()
+      if scheduler:
+        scheduler.step()
+        lernrate.append(scheduler.get_last_lr()[0])
       # Update pbar-tqdm
       pred = y_pred.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
       correct += pred.eq(target.view_as(pred)).sum().item()
@@ -92,18 +95,14 @@ class train_test_evaluate:
 
 
 
-  def Training(self,epochs,model,criterion,device, optimizer, trainloader, testloader, LR):
+  def Training(self,epochs,model,criterion,device, optimizer, trainloader, testloader, scheduler):
     Testloss = 0
-    LRvalues = self.OneCyclePolicy(LR, 1, epochs)
     #optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.95)
-    #scheduler = ReduceLROnPlateau(optimizer, 'min') #StepLR(optimizer, step_size=6, gamma=0.1)
     for epoch in range(epochs):
         print("EPOCH:", epoch)
-        self.update_lr(optimizer,LRvalues[epoch])
-        lernrate.append(LRvalues[epoch])
-        self.train(model, criterion,device, trainloader, optimizer, epoch)
+        self.train(model, criterion,device, trainloader, optimizer, epoch, scheduler)
         Testloss = self.test(model,criterion, device, testloader)
-        #scheduler.step(Testloss)
+
 
   def plotPerformanceGraph(self):
     import matplotlib.pyplot as plt
