@@ -2,6 +2,84 @@ import torch.nn as nn
 import torch.nn.functional as F
 from base_functions import *
 dropout_value = 0.1
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+
+class Net_resnet(nn.Module):
+    def __init__(self):
+        super(Net_resnet, self).__init__()
+        
+        self.preplayer = nn.Sequential(
+            nn.Conv2d(in_channels=3, out_channels=64, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(64),
+            nn.ReLU()
+        )
+        
+        self.convblock1 = nn.Sequential(
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.MaxPool2d(2,2),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+        )
+  
+        self.resblock1 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=128, out_channels=128, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+        ) 
+        
+ 
+        self.convblock2 = nn.Sequential(
+            nn.Conv2d(in_channels=128, out_channels=256, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.MaxPool2d(2,2),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+        )
+      
+        self.convblock3 = nn.Sequential(
+            nn.Conv2d(in_channels=256, out_channels=512, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.MaxPool2d(2,2),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+        )
+      
+        self.resblock2 = nn.Sequential(
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=512, out_channels=512, kernel_size=(3, 3), padding=1, stride=1, bias=False),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+        ) 
+
+        self.maxpool = nn.Sequential(
+            nn.MaxPool2d(4,2)
+        ) 
+
+        self.fc = nn.Sequential(
+            nn.Linear(512, 10)
+    
+        ) 
+
+    def forward(self, x):
+        x = self.preplayer(x)
+        x = self.convblock1(x)
+        rn1 = self.resblock1(x)
+        x = x+rn1
+        x = self.convblock2(x)
+        x = self.convblock3(x)
+        rn2 = self.resblock2(x)
+        x = x+rn2
+        x = self.maxpool(x)
+        x = self.fc(torch.squeeze(x))
+        x = x.view(-1, 10)
+        return F.log_softmax(x, dim=-1)
 class Net_depth_dialated(nn.Module):
     def __init__(self):
         super(Net_depth_dialated, self).__init__()
